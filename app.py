@@ -24,7 +24,7 @@ from reportlab.platypus import (
     KeepTogether,
 )
 # FASTAPI URL
-FASTAPI_URL = os.getenv("FASTAPI_URL", "http://localhost:8000")
+FASTAPI_URL = os.getenv("FASTAPI_URL", "https://ai-interview-studio-2.onrender.com")
 # PAGE CONFIG
 st.set_page_config(
     page_title="AI Interview Studio",
