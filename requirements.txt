@@ -5,6 +5,7 @@ python-multipart==0.0.20
 
 # ── Frontend & Utilities ────────────────────────────────────────────────────
 streamlit==1.41.1
+rich==13.9.4
 requests==2.32.3
 reportlab==4.2.5
 pypdf==5.1.0
