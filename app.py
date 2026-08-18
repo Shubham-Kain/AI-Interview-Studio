@@ -23,7 +23,7 @@ from reportlab.platypus import (
     KeepTogether,
 )
 # FASTAPI URL
-FASTAPI_URL = "http://127.0.0.1:8000"
+FASTAPI_URL = os.getenv("FASTAPI_URL", "http://localhost:8000")
 # PAGE CONFIG
 st.set_page_config(
     page_title="AI Interview Studio",
