@@ -1,5 +1,25 @@
-# ── Streamlit Cloud Frontend Dependencies ───────────────────────────────────
+# ── Web Framework & Server ──────────────────────────────────────────────────
+fastapi==0.115.5
+uvicorn==0.32.1
+python-multipart==0.0.20
+
+# ── Frontend & Document Processing ──────────────────────────────────────────
 streamlit==1.41.1
 requests==2.32.3
 reportlab==4.2.5
 pypdf==5.1.0
+
+# ── Config / Validation ─────────────────────────────────────────────────────
+python-dotenv==1.0.1
+pydantic==2.10.3
+pydantic-settings==2.7.0
+
+# ── LangChain / LangGraph ───────────────────────────────────────────────────
+langchain==0.3.13
+langchain-core==0.3.28
+langchain-openai==0.2.14
+langgraph==0.2.60
+
+# ── Speech (STT / TTS) ─────────────────────────────────────────────────────
+faster-whisper==1.0.3
+edge-tts==6.1.12

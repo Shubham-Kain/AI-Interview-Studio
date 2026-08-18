@@ -1,8 +1,13 @@
 # ── Web Framework & Server ──────────────────────────────────────────────────
 fastapi==0.115.5
-uvicorn[standard]==0.32.1
+uvicorn==0.32.1
 python-multipart==0.0.20
+
+# ── Frontend & Document Processing ──────────────────────────────────────────
+streamlit==1.41.1
 requests==2.32.3
+reportlab==4.2.5
+pypdf==5.1.0
 
 # ── Config / Validation ─────────────────────────────────────────────────────
 python-dotenv==1.0.1
