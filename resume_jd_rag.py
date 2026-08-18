@@ -1,3 +1,4 @@
+import json
 import math
 import re
 from collections import Counter
@@ -318,11 +319,22 @@ class ResumeJDRAG:
         self.prompt = ChatPromptTemplate.from_template(
             RAG_GAP_ANALYSIS_PROMPT
         )
-        self.chain = self.prompt | self.structured_llm
-
         # Fast in-memory stores
         self.resume_store = FastBM25Store()
         self.jd_store = FastBM25Store()
+
+    @staticmethod
+    def _extract_json(raw_text: str) -> dict:
+        """Extract and parse JSON from model response text cleanly."""
+        text = raw_text.strip()
+        match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", text)
+        if match:
+            text = match.group(1).strip()
+        start = text.find("{")
+        end = text.rfind("}")
+        if start != -1 and end != -1:
+            text = text[start : end + 1]
+        return json.loads(text)
 
     # ── PUBLIC API ─────────────────────────────────────────────────────────────
 
@@ -365,13 +377,83 @@ class ResumeJDRAG:
 
     def analyze(self) -> GapAnalysisResult:
         resume_context, jd_context = self.retrieve()
-        result = self.chain.invoke(
-            {
-                "resume_context": resume_context,
-                "job_description_context": jd_context,
-            }
+        prompt = f"""{RAG_GAP_ANALYSIS_PROMPT.format(
+            resume_context=resume_context,
+            job_description_context=jd_context,
+        )}
+
+============================================================
+REQUIRED JSON OUTPUT FORMAT
+============================================================
+Return ONLY a valid JSON object matching the GapAnalysisResult schema, with NO markdown code fences and NO explanatory text:
+{{
+  "job": {{
+    "job_title": "...",
+    "required_skills": [],
+    "preferred_skills": [],
+    "experience_requirements": [],
+    "responsibilities": [],
+    "technologies": [],
+    "other_requirements": []
+  }},
+  "candidate": {{
+    "name": "...",
+    "education": [],
+    "technical_skills": [],
+    "projects": [],
+    "work_experience": [],
+    "certifications": [],
+    "tools_and_technologies": []
+  }},
+  "comparison": {{
+    "matched_required_skills": [],
+    "partially_matched_required_skills": [],
+    "missing_required_skills": [],
+    "unknown_required_skills": [],
+    "matched_preferred_skills": [],
+    "missing_preferred_skills": [],
+    "matching_technologies": [],
+    "partial_technologies": [],
+    "missing_technologies": [],
+    "unknown_technologies": []
+  }},
+  "experience_gap": {{
+    "required": "...",
+    "candidate": "...",
+    "status": "Matched",
+    "gap": "..."
+  }},
+  "responsibility_gap": {{
+    "supported": [],
+    "partially_supported": [],
+    "not_supported": []
+  }},
+  "skill_gap_analysis": {{
+    "critical_gaps": [],
+    "moderate_gaps": [],
+    "minor_gaps": []
+  }},
+  "additional_candidate_skills": [],
+  "interview_focus_areas": [
+    {{"topic": "...", "reason": "...", "priority": "High"}}
+  ],
+  "overall_fit": {{
+    "status": "Good Match",
+    "reason": "..."
+  }}
+}}
+"""
+        response = self.llm.invoke(prompt)
+        raw_text = (
+            response.content if hasattr(response, "content") else str(response)
         )
-        return result
+        if isinstance(raw_text, list):
+            raw_text = " ".join(
+                str(c.get("text", c) if isinstance(c, dict) else c)
+                for c in raw_text
+            )
+        data = self._extract_json(raw_text)
+        return GapAnalysisResult.model_validate(data)
 
     # ── RETRIEVAL ──────────────────────────────────────────────────────────────
 
