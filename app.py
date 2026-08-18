@@ -26,7 +26,7 @@ from reportlab.platypus import (
 # FASTAPI URL — set FASTAPI_URL in Streamlit Cloud secrets to point to your Render backend
 FASTAPI_URL = os.getenv(
     "FASTAPI_URL",
-    "https://ai-interview-studio-2.onrender.com",
+    "https://ai-interview-studio-5.onrender.com",
 ).rstrip("/")
 # PAGE CONFIG
 st.set_page_config(
