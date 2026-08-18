@@ -14,7 +14,7 @@ venv/
 env/
 .venv/
 
-# ChromaDB local data — ephemeral on Render, don't commit
+# ChromaDB local data (no longer used on server, kept for local dev only)
 chroma_db/
 
 # Streamlit cache

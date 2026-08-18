@@ -1,6 +1,7 @@
 from typing import List, Tuple
 from langchain_core.documents import Document
 from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.vectorstores import InMemoryVectorStore
 from gap_schema import GapAnalysisResult
 
 RAG_GAP_ANALYSIS_PROMPT = """
@@ -234,6 +235,7 @@ RESUME_QUERIES = [
     "candidate work experience companies roles responsibilities achievements",
     "candidate tools technologies databases cloud platforms AI ML",
 ]
+
 # JOB DESCRIPTION RETRIEVAL QUERIES
 JD_QUERIES = [
     "job title required skills mandatory qualifications",
@@ -246,147 +248,131 @@ JD_QUERIES = [
 
 
 class ResumeJDRAG:
+    """
+    Resume-JD RAG pipeline using InMemoryVectorStore.
+    No external database required — vectors are stored in RAM,
+    which is fine since Render's disk is ephemeral and each
+    request clears and repopulates the store anyway.
+    """
+
     def __init__(
         self,
         llm,
+        resume_k: int = 3,
+        jd_k: int = 3,
+        # persist_directory kept for backward-compat — ignored
         persist_directory: str = "./chroma_db",
-        resume_k: int = 2,
-        jd_k: int = 2,
     ):
         self.llm = llm
-        self.persist_directory = persist_directory
         self.resume_k = resume_k
         self.jd_k = jd_k
-        self.embedding = None
-        # STRUCTURED LLM — built here so chain is always available
-        self.structured_llm = (
-            self.llm.with_structured_output(
-                GapAnalysisResult
-            )
+        self._embedding = None
+
+        # STRUCTURED LLM — builds the LangChain chain
+        self.structured_llm = self.llm.with_structured_output(
+            GapAnalysisResult
         )
-        # PROMPT
         self.prompt = ChatPromptTemplate.from_template(
             RAG_GAP_ANALYSIS_PROMPT
         )
         self.chain = self.prompt | self.structured_llm
-        # CREATE VECTOR STORES
-        self._create_vectorstores()
+
+        # In-memory vector stores (created fresh per request via clear_collections)
+        self.resume_store: InMemoryVectorStore | None = None
+        self.jd_store: InMemoryVectorStore | None = None
+        self._init_stores()
+
+    # ── EMBEDDING (lazy — loads sentence-transformers on first call) ────────────
 
     def _get_embedding(self):
-        if self.embedding is None:
-            # Lazy import — prevents sentence-transformers from loading at startup
+        if self._embedding is None:
             from langchain_huggingface import HuggingFaceEmbeddings
-            from langchain_chroma import Chroma  # noqa: F401 — imported for side-effect check
-            self.embedding = HuggingFaceEmbeddings(
+            self._embedding = HuggingFaceEmbeddings(
                 model_name="sentence-transformers/all-MiniLM-L6-v2"
             )
-        return self.embedding
+        return self._embedding
 
-    # CREATE / RECREATE VECTOR STORES
-    def _create_vectorstores(self):
-        from langchain_chroma import Chroma
+    # ── VECTOR STORE INIT ──────────────────────────────────────────────────────
+
+    def _init_stores(self):
+        """Create fresh in-memory stores (no disk I/O)."""
         embedding = self._get_embedding()
-        self.resume_vectorstore = Chroma(
-            collection_name="resume_collection",
-            embedding_function=embedding,
-            persist_directory=(
-                f"{self.persist_directory}/resume"
-            ),
-        )
-        self.jd_vectorstore = Chroma(
-            collection_name="jd_collection",
-            embedding_function=embedding,
-            persist_directory=(
-                f"{self.persist_directory}/job_description"
-            ),
-        )
-        # RETRIEVERS
-        self.resume_retriever = (
-            self.resume_vectorstore.as_retriever(
-                search_type="similarity",
-                search_kwargs={
-                    "k": self.resume_k
-                },
-            )
-        )
-        self.jd_retriever = (
-            self.jd_vectorstore.as_retriever(
-                search_type="similarity",
-                search_kwargs={
-                    "k": self.jd_k
-                },
-            )
-        )
+        self.resume_store = InMemoryVectorStore(embedding=embedding)
+        self.jd_store = InMemoryVectorStore(embedding=embedding)
 
-    # CLEAR OLD RESUME + JD COLLECTIONS
+    # ── PUBLIC API ─────────────────────────────────────────────────────────────
+
     def clear_collections(self) -> None:
-        try:
-            self.resume_vectorstore.delete_collection()
-        except Exception:
-            pass
-        try:
-            self.jd_vectorstore.delete_collection()
-        except Exception:
-            pass
-        self._create_vectorstores()
+        """Reset stores before processing a new request."""
+        self._init_stores()
 
-    # ADD RESUME
     def add_resume(
         self,
         resume_text: str,
         candidate_id: str = "default_candidate",
     ) -> None:
         if not resume_text.strip():
-            raise ValueError(
-                "Resume text cannot be empty."
-            )
+            raise ValueError("Resume text cannot be empty.")
         chunks = self._create_chunks(
             text=resume_text,
             source="resume",
             document_id=candidate_id,
         )
         if not chunks:
-            raise ValueError(
-                "No resume chunks were created."
-            )
-        ids = [
-            f"resume_{candidate_id}_{index}"
-            for index in range(len(chunks))
-        ]
-        self.resume_vectorstore.add_documents(
-            documents=chunks,
-            ids=ids,
-        )
+            raise ValueError("No resume chunks were created.")
+        self.resume_store.add_documents(documents=chunks)
 
-    # ADD JOB DESCRIPTION
     def add_job_description(
         self,
         job_description: str,
         job_id: str = "default_job",
     ) -> None:
         if not job_description.strip():
-            raise ValueError(
-                "Job description cannot be empty."
-            )
+            raise ValueError("Job description cannot be empty.")
         chunks = self._create_chunks(
             text=job_description,
             source="job_description",
             document_id=job_id,
         )
         if not chunks:
-            raise ValueError(
-                "No JD chunks were created."
+            raise ValueError("No JD chunks were created.")
+        self.jd_store.add_documents(documents=chunks)
+
+    def analyze(self) -> GapAnalysisResult:
+        resume_context, jd_context = self.retrieve()
+        result = self.chain.invoke(
+            {
+                "resume_context": resume_context,
+                "job_description_context": jd_context,
+            }
+        )
+        return result
+
+    # ── RETRIEVAL ──────────────────────────────────────────────────────────────
+
+    def retrieve(self) -> Tuple[str, str]:
+        resume_docs: List[Document] = []
+        jd_docs: List[Document] = []
+
+        for query in RESUME_QUERIES:
+            resume_docs.extend(
+                self.resume_store.similarity_search(query, k=self.resume_k)
             )
-        ids = [
-            f"jd_{job_id}_{index}"
-            for index in range(len(chunks))
-        ]
-        self.jd_vectorstore.add_documents(
-            documents=chunks,
-            ids=ids,
+        for query in JD_QUERIES:
+            jd_docs.extend(
+                self.jd_store.similarity_search(query, k=self.jd_k)
+            )
+
+        resume_docs = self._deduplicate(resume_docs)[:20]
+        jd_docs = self._deduplicate(jd_docs)[:20]
+
+        return (
+            self._format_documents(resume_docs),
+            self._format_documents(jd_docs),
         )
 
-    # CHUNKING
+    # ── HELPERS ────────────────────────────────────────────────────────────────
+
     @staticmethod
     def _create_chunks(
         text: str,
@@ -398,18 +384,13 @@ class ResumeJDRAG:
         text = text.strip()
         if not text:
             return []
-        chunks = []
+        chunks: List[Document] = []
         start = 0
         chunk_id = 0
-        text_length = len(text)
-        while start < text_length:
-            end = min(
-                start + chunk_size,
-                text_length,
-            )
-            chunk_text = text[
-                start:end
-            ].strip()
+        length = len(text)
+        while start < length:
+            end = min(start + chunk_size, length)
+            chunk_text = text[start:end].strip()
             if chunk_text:
                 chunks.append(
                     Document(
@@ -422,105 +403,31 @@ class ResumeJDRAG:
                     )
                 )
                 chunk_id += 1
-            if end >= text_length:
+            if end >= length:
                 break
-            start = max(
-                0,
-                end - chunk_overlap,
-            )
+            start = max(0, end - chunk_overlap)
         return chunks
 
-    # RETRIEVE RESUME + JD
-    def retrieve(
-        self,
-    ) -> Tuple[str, str]:
-        resume_documents = []
-        jd_documents = []
-        # RESUME RETRIEVAL
-        for query in RESUME_QUERIES:
-            docs = self.resume_retriever.invoke(
-                query
-            )
-            resume_documents.extend(docs)
-        # JD RETRIEVAL
-        for query in JD_QUERIES:
-            docs = self.jd_retriever.invoke(
-                query
-            )
-            jd_documents.extend(docs)
-        # REMOVE DUPLICATES
-        resume_documents = self._remove_duplicates(
-            resume_documents
-        )
-        jd_documents = self._remove_duplicates(
-            jd_documents
-        )
-        # LIMIT CONTEXT SIZE
-        resume_documents = resume_documents[:20]
-        jd_documents = jd_documents[:20]
-        # FORMAT CONTEXT
-        resume_context = self._format_documents(
-            resume_documents
-        )
-        jd_context = self._format_documents(
-            jd_documents
-        )
-        return (
-            resume_context,
-            jd_context,
-        )
-
-    # REMOVE DUPLICATES
     @staticmethod
-    def _remove_duplicates(
-        documents: List[Document],
-    ) -> List[Document]:
-        unique_documents = []
-        seen = set()
-        for doc in documents:
+    def _deduplicate(docs: List[Document]) -> List[Document]:
+        seen: set = set()
+        unique: List[Document] = []
+        for doc in docs:
             content = doc.page_content.strip()
-            if not content:
-                continue
-            if content in seen:
-                continue
-            seen.add(content)
-            unique_documents.append(doc)
-        return unique_documents
+            if content and content not in seen:
+                seen.add(content)
+                unique.append(doc)
+        return unique
 
-    # FORMAT DOCUMENTS
     @staticmethod
-    def _format_documents(
-        documents: List[Document],
-    ) -> str:
-        if not documents:
-            return (
-                "No relevant information "
-                "was retrieved."
+    def _format_documents(docs: List[Document]) -> str:
+        if not docs:
+            return "No relevant information was retrieved."
+        parts = []
+        for i, doc in enumerate(docs, start=1):
+            parts.append(
+                f"--- Retrieved Chunk {i} ---\n"
+                f"{doc.page_content}\n"
+                f"Source Metadata: {doc.metadata}\n"
             )
-        formatted_chunks = []
-        for index, doc in enumerate(
-            documents,
-            start=1,
-        ):
-            formatted_chunks.append(
-                f"""
---- Retrieved Chunk {index} ---
-{doc.page_content}
-Source Metadata:
-{doc.metadata}
-"""
-            )
-        return "\n".join(
-            formatted_chunks
-        )
-
-    # GAP ANALYSIS
-    def analyze(self) -> GapAnalysisResult:
-        resume_context, jd_context = self.retrieve()
-        result = self.chain.invoke(
-            {
-                "resume_context": resume_context,
-                "job_description_context": jd_context,
-            }
-        )
-        return result
+        return "\n".join(parts)

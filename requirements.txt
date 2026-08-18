@@ -19,19 +19,12 @@ langchain==0.3.13
 langchain-core==0.3.28
 langchain-openai==0.2.14
 langchain-huggingface==0.1.2
-langchain-chroma==0.1.4
 langgraph==0.2.60
 
-# ── Vector DB — pin to 0.4.x which ships pre-built manylinux wheels ────────────
-chromadb==0.4.24
-
-# ── Embeddings — pre-built wheel on all platforms ─────────────────────────────
+# ── Embeddings — pure Python wheel ────────────────────────────────────────────
 sentence-transformers==2.7.0
 
-# ── Tokenizer — pre-built wheel available for py311-linux ─────────────────────
-tiktoken==0.7.0
-
-# ── Numpy — 1.x avoids ABI issues with sentence-transformers 2.x ──────────────
+# ── Numpy ─────────────────────────────────────────────────────────────────────
 numpy==1.26.4
 
 # ── Speech (STT / TTS) ────────────────────────────────────────────────────────
