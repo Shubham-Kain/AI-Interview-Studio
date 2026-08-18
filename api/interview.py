@@ -57,31 +57,36 @@ def health():
 def generate_interview(
     request: InterviewGenerateRequest,
 ):
-    if rag is None:
+    # Import services from main to avoid circular import
+    import main
+    local_rag = main.rag_service
+    local_question_generator = main.question_generator_service
+    
+    if local_local_rag is None:
         raise HTTPException(
             status_code=500,
             detail="RAG service is not initialized.",
         )
-    if question_generator is None:
+    if local_question_generator is None:
         raise HTTPException(
             status_code=500,
             detail="Question generator is not initialized.",
         )
     try:
         # CLEAR PREVIOUS DATA
-        rag.clear_collections()
+        local_rag.clear_collections()
         # ADD RESUME
-        rag.add_resume(
+        local_rag.add_resume(
             resume_text=request.resume_text,
             candidate_id="api_candidate",
         )
         # ADD JOB DESCRIPTION
-        rag.add_job_description(
+        local_rag.add_job_description(
             job_description=request.job_description,
             job_id="api_job",
         )
         # GAP ANALYSIS
-        gap_result = rag.analyze()
+        gap_result = local_rag.analyze()
         # JOB TITLE
         final_job_title = (
             gap_result.job.job_title.strip()
@@ -90,7 +95,7 @@ def generate_interview(
         )
         # GENERATE QUESTIONS
         question_result = (
-            question_generator.generate(
+            local_question_generator.generate(
                 rag_result=gap_result,
                 job_title=final_job_title,
                 difficulty=request.difficulty,

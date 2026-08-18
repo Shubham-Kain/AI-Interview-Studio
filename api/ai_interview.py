@@ -74,7 +74,9 @@ def start_interview(
         "Hard",
     ] = Form("Medium"),
 ):
-    if _interview_graph is None:
+    import main
+    graph = main.interview_graph_service
+    if graph is None:
         raise HTTPException(
             status_code=500,
             detail="Interview graph is not initialized.",
@@ -84,7 +86,7 @@ def start_interview(
     )
     try:
         result = (
-            _interview_graph.start(
+            graph.start(
                 role=role,
                 difficulty=difficulty,
                 interview_id=interview_id,
@@ -148,7 +150,9 @@ async def answer_interview(
     interview_id: str = Form(...),
     audio: UploadFile = File(...),
 ):
-    if _interview_graph is None:
+    import main
+    graph = main.interview_graph_service
+    if graph is None:
         raise HTTPException(
             status_code=500,
             detail="Interview graph is not initialized.",
@@ -169,7 +173,7 @@ async def answer_interview(
     try:
         audio_bytes = await audio.read()
         result = (
-            _interview_graph.answer(
+            graph.answer(
                 interview_id=interview_id,
                 role=session["role"],
                 difficulty=session["difficulty"],
@@ -277,7 +281,9 @@ async def answer_interview(
 def quit_interview(
     interview_id: str,
 ):
-    if _interview_graph is None:
+    import main
+    graph = main.interview_graph_service
+    if graph is None:
         raise HTTPException(
             status_code=500,
             detail="Interview graph is not initialized.",
@@ -298,7 +304,7 @@ def quit_interview(
     try:
         # GENERATE FINAL REPORT
         result = (
-            _interview_graph.finalize(
+            graph.finalize(
                 interview_id=interview_id,
                 role=session["role"],
                 difficulty=session["difficulty"],
