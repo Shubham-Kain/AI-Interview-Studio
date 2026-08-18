@@ -132,6 +132,14 @@ class OverallFit(BaseModel):
     ] = "Insufficient Evidence"
     reason: str = ""
 # =========================================================
+# INTERVIEW FOCUS AREA
+# =========================================================
+class InterviewFocusArea(BaseModel):
+    topic: str = ""
+    reason: str = ""
+    priority: str = "Medium"
+
+# =========================================================
 # COMPLETE GAP ANALYSIS
 # =========================================================
 class GapAnalysisResult(BaseModel):
@@ -144,7 +152,7 @@ class GapAnalysisResult(BaseModel):
     additional_candidate_skills: List[str] = Field(
         default_factory=list
     )
-    interview_focus_areas: List[dict] = Field(
+    interview_focus_areas: List[InterviewFocusArea] = Field(
         default_factory=list
     )
     overall_fit: OverallFit

@@ -1439,33 +1439,36 @@ def render_question_generator():
                 {},
             )
         )
+        def _get_dist(k1, k2):
+            return distribution.get(k1, distribution.get(k2, 0)) if isinstance(distribution, dict) else 0
+
         d1, d2, d3 = st.columns(3)
         with d1:
             st.write(
                 f"**Basic:** "
-                f"{distribution.get('Basic', 0)}"
+                f"{_get_dist('Basic', 'Basic')}"
             )
             st.write(
                 f"**Technical:** "
-                f"{distribution.get('Technical', 0)}"
+                f"{_get_dist('Technical', 'Technical')}"
             )
         with d2:
             st.write(
                 f"**Resume-Based:** "
-                f"{distribution.get('Resume-Based', 0)}"
+                f"{_get_dist('Resume-Based', 'Resume_Based')}"
             )
             st.write(
                 f"**Project-Based:** "
-                f"{distribution.get('Project-Based', 0)}"
+                f"{_get_dist('Project-Based', 'Project_Based')}"
             )
         with d3:
             st.write(
                 f"**Scenario-Based:** "
-                f"{distribution.get('Scenario-Based', 0)}"
+                f"{_get_dist('Scenario-Based', 'Scenario_Based')}"
             )
             st.write(
                 f"**Skill Gap:** "
-                f"{distribution.get('Skill Gap', 0)}"
+                f"{_get_dist('Skill Gap', 'Skill_Gap')}"
             )
         # PDF DOWNLOAD
         pdf_bytes = build_interview_questions_pdf(
