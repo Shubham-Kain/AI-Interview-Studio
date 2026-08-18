@@ -1,9 +1,12 @@
 from typing import List, Literal
 from pydantic import BaseModel, Field, ConfigDict
 
-###  CATEGORY DISTRIBUTION MODEL (avoids untyped Dict schema 422 errors) ###
-class CategoryDistribution(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, extra="allow")
+###  BASE MODEL WITH STRICT SCHEMA (OpenAI/Darkbloom compatible) ###
+class StrictModel(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+###  CATEGORY DISTRIBUTION MODEL ###
+class CategoryDistribution(StrictModel):
     Basic: int = Field(default=0)
     Technical: int = Field(default=0)
     Resume_Based: int = Field(default=0, alias="Resume-Based")
@@ -12,7 +15,7 @@ class CategoryDistribution(BaseModel):
     Skill_Gap: int = Field(default=0, alias="Skill Gap")
 
 ###  SINGLE INTERVIEW QUESTION   ###
-class InterviewQuestion(BaseModel):
+class InterviewQuestion(StrictModel):
     question_id: int
     category: Literal[
         "Basic",
@@ -34,7 +37,7 @@ class InterviewQuestion(BaseModel):
     )
 
 ###  COMPLETE QUESTION SET   ###
-class InterviewQuestionSet(BaseModel):
+class InterviewQuestionSet(StrictModel):
     job_title: str
     total_questions: int
     category_distribution: CategoryDistribution = Field(

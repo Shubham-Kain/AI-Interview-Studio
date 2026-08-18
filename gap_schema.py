@@ -1,9 +1,16 @@
 from typing import List, Literal
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
+
+# =========================================================
+# BASE STRICT MODEL
+# =========================================================
+class StrictModel(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
 # =========================================================
 # EXPERIENCE GAP
 # =========================================================
-class ExperienceGap(BaseModel):
+class ExperienceGap(StrictModel):
     required: str = ""
     candidate: str = ""
     status: Literal[
@@ -13,10 +20,11 @@ class ExperienceGap(BaseModel):
         "Unknown",
     ] = "Unknown"
     gap: str = ""
+
 # =========================================================
 # RESPONSIBILITY GAP
 # =========================================================
-class ResponsibilityGap(BaseModel):
+class ResponsibilityGap(StrictModel):
     supported: List[str] = Field(
         default_factory=list
     )
@@ -26,10 +34,11 @@ class ResponsibilityGap(BaseModel):
     not_supported: List[str] = Field(
         default_factory=list
     )
+
 # =========================================================
 # SKILL GAP ANALYSIS
 # =========================================================
-class SkillGapAnalysis(BaseModel):
+class SkillGapAnalysis(StrictModel):
     critical_gaps: List[str] = Field(
         default_factory=list
     )
@@ -39,10 +48,11 @@ class SkillGapAnalysis(BaseModel):
     minor_gaps: List[str] = Field(
         default_factory=list
     )
+
 # =========================================================
 # JOB INFORMATION
 # =========================================================
-class JobInformation(BaseModel):
+class JobInformation(StrictModel):
     job_title: str = ""
     required_skills: List[str] = Field(
         default_factory=list
@@ -62,10 +72,11 @@ class JobInformation(BaseModel):
     other_requirements: List[str] = Field(
         default_factory=list
     )
+
 # =========================================================
 # CANDIDATE INFORMATION
 # =========================================================
-class CandidateInformation(BaseModel):
+class CandidateInformation(StrictModel):
     name: str = ""
     education: List[str] = Field(
         default_factory=list
@@ -85,10 +96,11 @@ class CandidateInformation(BaseModel):
     tools_and_technologies: List[str] = Field(
         default_factory=list
     )
+
 # =========================================================
 # COMPARISON
 # =========================================================
-class ComparisonResult(BaseModel):
+class ComparisonResult(StrictModel):
     matched_required_skills: List[str] = Field(
         default_factory=list
     )
@@ -119,10 +131,11 @@ class ComparisonResult(BaseModel):
     unknown_technologies: List[str] = Field(
         default_factory=list
     )
+
 # =========================================================
 # OVERALL FIT
 # =========================================================
-class OverallFit(BaseModel):
+class OverallFit(StrictModel):
     status: Literal[
         "Strong Match",
         "Good Match",
@@ -131,10 +144,11 @@ class OverallFit(BaseModel):
         "Insufficient Evidence",
     ] = "Insufficient Evidence"
     reason: str = ""
+
 # =========================================================
 # INTERVIEW FOCUS AREA
 # =========================================================
-class InterviewFocusArea(BaseModel):
+class InterviewFocusArea(StrictModel):
     topic: str = ""
     reason: str = ""
     priority: str = "Medium"
@@ -142,7 +156,7 @@ class InterviewFocusArea(BaseModel):
 # =========================================================
 # COMPLETE GAP ANALYSIS
 # =========================================================
-class GapAnalysisResult(BaseModel):
+class GapAnalysisResult(StrictModel):
     job: JobInformation
     candidate: CandidateInformation
     comparison: ComparisonResult
