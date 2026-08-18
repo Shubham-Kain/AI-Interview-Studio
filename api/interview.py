@@ -1,13 +1,13 @@
 from typing import Literal
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
-from resume_jd_rag import ResumeJDRAG
-from question_generator import InterviewQuestionGenerator
+
 # ROUTER
 router = APIRouter(
     prefix="/api/interview",
     tags=["Interview Generator"],
 )
+
 # REQUEST MODEL
 class InterviewGenerateRequest(BaseModel):
     resume_text: str = Field(
@@ -32,19 +32,7 @@ class InterviewGenerateRequest(BaseModel):
         ge=6,
         le=30,
     )
-# SERVICES
-rag = None
-question_generator = None
-def initialize_services(
-    rag_service: ResumeJDRAG,
-    question_generator_service: InterviewQuestionGenerator,
-):
-    global rag
-    global question_generator
-    rag = rag_service
-    question_generator = (
-        question_generator_service
-    )
+
 # HEALTH
 @router.get("/health")
 def health():
@@ -52,17 +40,25 @@ def health():
         "status": "ok",
         "service": "Interview Generator",
     }
+
 # GENERATE INTERVIEW QUESTIONS
 @router.post("/generate")
 def generate_interview(
     request: InterviewGenerateRequest,
 ):
-    # Import services from main to avoid circular import
+    # Lazy-load services from main to avoid circular import
+    # and to prevent heavy models loading at server startup
     import main
-    local_rag = main.rag_service
-    local_question_generator = main.question_generator_service
-    
-    if local_local_rag is None:
+    try:
+        local_rag = main.get_rag_service()
+        local_question_generator = main.get_question_generator_service()
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Service initialization failed: {str(e)}",
+        )
+
+    if local_rag is None:
         raise HTTPException(
             status_code=500,
             detail="RAG service is not initialized.",

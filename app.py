@@ -23,8 +23,11 @@ from reportlab.platypus import (
     TableStyle,
     KeepTogether,
 )
-# FASTAPI URL
-FASTAPI_URL = os.getenv("FASTAPI_URL", "https://ai-interview-studio-2.onrender.com")
+# FASTAPI URL — set FASTAPI_URL in Streamlit Cloud secrets to point to your Render backend
+FASTAPI_URL = os.getenv(
+    "FASTAPI_URL",
+    "https://ai-interview-studio-2.onrender.com",
+).rstrip("/")
 # PAGE CONFIG
 st.set_page_config(
     page_title="AI Interview Studio",
@@ -1016,7 +1019,8 @@ def render_sidebar():
             "FastAPI: Offline"
         )
         st.sidebar.caption(
-            "Run: uvicorn main:app --reload"
+            f"Backend URL: {FASTAPI_URL}\n"
+            "Ensure the Render backend is deployed and FASTAPI_URL secret is set."
         )
 
 # QUESTION GENERATOR
@@ -1185,9 +1189,9 @@ def render_question_generator():
                 )
             except requests.ConnectionError:
                 st.error(
-                    "Could not connect to FastAPI.\n\n"
-                    "Start the backend with:\n"
-                    "`uvicorn main:app --reload`"
+                    f"Could not connect to backend: {FASTAPI_URL}\n\n"
+                    "Ensure the Render backend is running and "
+                    "FASTAPI_URL is set correctly in Streamlit Cloud secrets."
                 )
                 st.stop()
             except requests.Timeout:
@@ -2236,9 +2240,9 @@ def render_ai_interview():
                 st.rerun()
             except requests.ConnectionError:
                 st.error(
-                    "FastAPI is not running.\n\n"
-                    "Start it with:\n"
-                    "`uvicorn main:app --reload`"
+                    f"Could not connect to backend: {FASTAPI_URL}\n\n"
+                    "Ensure the Render backend is running and "
+                    "FASTAPI_URL is set in Streamlit Cloud secrets."
                 )
             except requests.Timeout:
                 st.error(

@@ -1,6 +1,6 @@
 import asyncio
 import threading
-import edge_tts
+
 
 class TextToSpeech:
     def __init__(
@@ -12,10 +12,19 @@ class TextToSpeech:
         self.voice = voice
         self.rate = rate
         self.volume = volume
+
     async def _generate(
         self,
         text: str,
     ) -> bytes:
+        # Lazy import — prevents edge-tts from loading at server startup
+        try:
+            import edge_tts
+        except ImportError as e:
+            raise RuntimeError(
+                "edge-tts is not installed. "
+                "Add it to requirements.txt."
+            ) from e
         communicate = edge_tts.Communicate(
             text=text,
             voice=self.voice,
@@ -31,6 +40,7 @@ class TextToSpeech:
         return b"".join(
             audio_chunks
         )
+
     def _run_async_in_thread(
         self,
         text: str,
@@ -44,6 +54,7 @@ class TextToSpeech:
             "audio": None,
             "error": None,
         }
+
         def runner():
             try:
                 loop = asyncio.new_event_loop()
@@ -60,6 +71,7 @@ class TextToSpeech:
                     loop.close()
             except Exception as exc:
                 result["error"] = exc
+
         thread = threading.Thread(
             target=runner,
             daemon=True,
@@ -69,6 +81,7 @@ class TextToSpeech:
         if result["error"] is not None:
             raise result["error"]
         return result["audio"]
+
     def generate(
         self,
         text: str,

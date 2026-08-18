@@ -1,7 +1,7 @@
 import os
 import tempfile
 from typing import Optional
-from faster_whisper import WhisperModel
+
 
 class SpeechToText:
     def __init__(
@@ -17,6 +17,15 @@ class SpeechToText:
 
     def _get_model(self):
         if self.model is None:
+            # Lazy import — prevents faster-whisper from loading
+            # at server startup and crashing Render free-tier RAM
+            try:
+                from faster_whisper import WhisperModel
+            except ImportError as e:
+                raise RuntimeError(
+                    "faster-whisper is not installed. "
+                    "Add it to requirements.txt."
+                ) from e
             self.model = WhisperModel(
                 self.model_size,
                 device=self.device,

@@ -1,8 +1,6 @@
 from typing import List, Tuple
 from langchain_core.documents import Document
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_chroma import Chroma
 from gap_schema import GapAnalysisResult
 
 RAG_GAP_ANALYSIS_PROMPT = """
@@ -245,6 +243,8 @@ JD_QUERIES = [
     "job technologies tools frameworks databases cloud platforms",
     "job education certifications soft skills other requirements",
 ]
+
+
 class ResumeJDRAG:
     def __init__(
         self,
@@ -258,16 +258,7 @@ class ResumeJDRAG:
         self.resume_k = resume_k
         self.jd_k = jd_k
         self.embedding = None
-        # CREATE VECTOR STORES
-        self._create_vectorstores()
-
-    def _get_embedding(self):
-        if self.embedding is None:
-            self.embedding = HuggingFaceEmbeddings(
-                model_name="sentence-transformers/all-MiniLM-L6-v2"
-            )
-        return self.embedding
-        # STRUCTURED LLM
+        # STRUCTURED LLM — built here so chain is always available
         self.structured_llm = (
             self.llm.with_structured_output(
                 GapAnalysisResult
@@ -278,8 +269,22 @@ class ResumeJDRAG:
             RAG_GAP_ANALYSIS_PROMPT
         )
         self.chain = self.prompt | self.structured_llm
+        # CREATE VECTOR STORES
+        self._create_vectorstores()
+
+    def _get_embedding(self):
+        if self.embedding is None:
+            # Lazy import — prevents sentence-transformers from loading at startup
+            from langchain_huggingface import HuggingFaceEmbeddings
+            from langchain_chroma import Chroma  # noqa: F401 — imported for side-effect check
+            self.embedding = HuggingFaceEmbeddings(
+                model_name="sentence-transformers/all-MiniLM-L6-v2"
+            )
+        return self.embedding
+
     # CREATE / RECREATE VECTOR STORES
     def _create_vectorstores(self):
+        from langchain_chroma import Chroma
         embedding = self._get_embedding()
         self.resume_vectorstore = Chroma(
             collection_name="resume_collection",
@@ -312,7 +317,7 @@ class ResumeJDRAG:
                 },
             )
         )
-    # CHANGE 3:
+
     # CLEAR OLD RESUME + JD COLLECTIONS
     def clear_collections(self) -> None:
         try:
@@ -324,6 +329,7 @@ class ResumeJDRAG:
         except Exception:
             pass
         self._create_vectorstores()
+
     # ADD RESUME
     def add_resume(
         self,
@@ -351,6 +357,7 @@ class ResumeJDRAG:
             documents=chunks,
             ids=ids,
         )
+
     # ADD JOB DESCRIPTION
     def add_job_description(
         self,
@@ -380,7 +387,6 @@ class ResumeJDRAG:
         )
 
     # CHUNKING
-
     @staticmethod
     def _create_chunks(
         text: str,
@@ -423,6 +429,7 @@ class ResumeJDRAG:
                 end - chunk_overlap,
             )
         return chunks
+
     # RETRIEVE RESUME + JD
     def retrieve(
         self,
@@ -448,7 +455,6 @@ class ResumeJDRAG:
         jd_documents = self._remove_duplicates(
             jd_documents
         )
-        # CHANGE 1:
         # LIMIT CONTEXT SIZE
         resume_documents = resume_documents[:20]
         jd_documents = jd_documents[:20]
@@ -465,7 +471,6 @@ class ResumeJDRAG:
         )
 
     # REMOVE DUPLICATES
-
     @staticmethod
     def _remove_duplicates(
         documents: List[Document],
@@ -481,9 +486,8 @@ class ResumeJDRAG:
             seen.add(content)
             unique_documents.append(doc)
         return unique_documents
-    
+
     # FORMAT DOCUMENTS
-    
     @staticmethod
     def _format_documents(
         documents: List[Document],
@@ -511,7 +515,6 @@ Source Metadata:
         )
 
     # GAP ANALYSIS
-
     def analyze(self) -> GapAnalysisResult:
         resume_context, jd_context = self.retrieve()
         result = self.chain.invoke(

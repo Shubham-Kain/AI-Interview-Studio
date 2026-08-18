@@ -1,34 +1,38 @@
 import os
 from dotenv import load_dotenv
+
 # =========================================================
 # LOAD ENVIRONMENT VARIABLES
 # =========================================================
 load_dotenv()
+
 # =========================================================
 # OPENROUTER API KEY
 # =========================================================
 OPENROUTER_API_KEY = (
     os.environ.get("OPENROUTER_API_KEY") or ""
 ).strip()
+
 OPENROUTER_BASE_URL = (
     "https://openrouter.ai/api/v1"
 )
+
 # =========================================================
 # MODEL
 # =========================================================
 MODEL_NAME = (
     os.environ.get("OPENROUTER_MODEL")
-    or "dots-studio/dots-3-note-preview:free"
+    or "google/gemma-3-4b-it:free"
 ).strip()
+
 # =========================================================
-# VALIDATION
+# VALIDATION — warn only at import time, raise at request time
+# so the server can still start and Render health check passes.
 # =========================================================
 if not OPENROUTER_API_KEY:
-    raise ValueError(
-        "OPENROUTER_API_KEY is missing. "
-        "Add it to your .env file."
-    )
-if not MODEL_NAME:
-    raise ValueError(
-        "OPENROUTER_MODEL is missing."
+    import warnings
+    warnings.warn(
+        "OPENROUTER_API_KEY is not set. "
+        "API requests will fail until it is provided.",
+        stacklevel=2,
     )

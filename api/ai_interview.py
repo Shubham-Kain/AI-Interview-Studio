@@ -8,25 +8,16 @@ from fastapi import (
     UploadFile,
 )
 from pydantic import BaseModel
-from interview_ai.graph import (
-    AIInterviewGraph,
-)
+
 # ROUTER
 router = APIRouter(
     prefix="/api/ai-interview",
     tags=["Interview with AI"],
 )
-# SESSION STORAGE
+
+# SESSION STORAGE (in-memory per-process)
 interviews = {}
-# GRAPH
-_interview_graph = None
-def initialize_ai_interview_services(
-    llm,
-):
-    global _interview_graph
-    _interview_graph = AIInterviewGraph(
-        llm=llm
-    )
+
 # START RESPONSE
 class StartInterviewResponse(
     BaseModel
@@ -38,6 +29,7 @@ class StartInterviewResponse(
     total_questions: int
     question: str
     audio_base64: str
+
 # ANSWER RESPONSE
 class AnswerResponse(
     BaseModel
@@ -52,6 +44,7 @@ class AnswerResponse(
     next_question: str
     audio_base64: str
     interview_completed: bool
+
 # FINAL RESPONSE
 class FinalReportResponse(
     BaseModel
@@ -61,6 +54,7 @@ class FinalReportResponse(
     total_questions: int
     average_score: float
     final_report: str
+
 # START
 @router.post(
     "/start",
@@ -75,7 +69,14 @@ def start_interview(
     ] = Form("Medium"),
 ):
     import main
-    graph = main.interview_graph_service
+    try:
+        graph = main.get_interview_graph_service()
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Interview graph initialization failed: {str(e)}",
+        )
+
     if graph is None:
         raise HTTPException(
             status_code=500,
@@ -141,6 +142,7 @@ def start_interview(
                 f"{str(e)}"
             ),
         )
+
 # ANSWER
 @router.post(
     "/answer",
@@ -151,7 +153,14 @@ async def answer_interview(
     audio: UploadFile = File(...),
 ):
     import main
-    graph = main.interview_graph_service
+    try:
+        graph = main.get_interview_graph_service()
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Interview graph initialization failed: {str(e)}",
+        )
+
     if graph is None:
         raise HTTPException(
             status_code=500,
@@ -273,6 +282,7 @@ async def answer_interview(
                 f"{str(e)}"
             ),
         )
+
 # QUIT / FINALIZE EARLY
 @router.post(
     "/quit",
@@ -282,7 +292,14 @@ def quit_interview(
     interview_id: str,
 ):
     import main
-    graph = main.interview_graph_service
+    try:
+        graph = main.get_interview_graph_service()
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Interview graph initialization failed: {str(e)}",
+        )
+
     if graph is None:
         raise HTTPException(
             status_code=500,
