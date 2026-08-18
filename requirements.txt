@@ -1,22 +1,39 @@
+# ── Web Framework ─────────────────────────────────────────────────────────────
 fastapi==0.115.5
 uvicorn[standard]==0.32.1
+python-multipart==0.0.20
+
+# ── Frontend ───────────────────────────────────────────────────────────────────
 streamlit==1.41.1
 requests==2.32.3
+reportlab==4.2.5
+pypdf==5.1.0
+
+# ── Config / Validation ────────────────────────────────────────────────────────
 python-dotenv==1.0.1
 pydantic==2.10.3
 pydantic-settings==2.7.0
+
+# ── LangChain / LangGraph ──────────────────────────────────────────────────────
 langchain==0.3.13
 langchain-core==0.3.28
 langchain-openai==0.2.14
 langchain-huggingface==0.1.2
 langchain-chroma==0.1.4
 langgraph==0.2.60
-chromadb==0.5.23
-sentence-transformers==3.3.1
-faster-whisper==1.1.0
-edge-tts==6.1.12
-reportlab==4.2.5
-pypdf==5.1.0
+
+# ── Vector DB — pin to 0.4.x which ships pre-built manylinux wheels ────────────
+chromadb==0.4.24
+
+# ── Embeddings — pre-built wheel on all platforms ─────────────────────────────
+sentence-transformers==2.7.0
+
+# ── Tokenizer — pre-built wheel available for py311-linux ─────────────────────
+tiktoken==0.7.0
+
+# ── Numpy — 1.x avoids ABI issues with sentence-transformers 2.x ──────────────
 numpy==1.26.4
-tiktoken==0.8.0
-python-multipart==0.0.20
+
+# ── Speech (STT / TTS) ────────────────────────────────────────────────────────
+faster-whisper==1.0.3
+edge-tts==6.1.12
