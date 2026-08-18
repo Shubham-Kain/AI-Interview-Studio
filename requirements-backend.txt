@@ -13,12 +13,7 @@ pydantic-settings==2.7.0
 langchain==0.3.13
 langchain-core==0.3.28
 langchain-openai==0.2.14
-langchain-huggingface==0.1.2
 langgraph==0.2.60
-
-# ── Embeddings / Vector Search ─────────────────────────────────────────────────
-sentence-transformers==2.7.0
-numpy==1.26.4
 
 # ── Speech (STT / TTS) ────────────────────────────────────────────────────────
 faster-whisper==1.0.3

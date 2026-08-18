@@ -18,11 +18,11 @@ OPENROUTER_BASE_URL = (
 )
 
 # =========================================================
-# MODEL
+# MODEL — using active, high-performance free model
 # =========================================================
 MODEL_NAME = (
     os.environ.get("OPENROUTER_MODEL")
-    or "google/gemma-3-4b-it:free"
+    or "google/gemma-4-26b-a4b-it:free"
 ).strip()
 
 # =========================================================
