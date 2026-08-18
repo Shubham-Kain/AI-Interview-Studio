@@ -5,6 +5,7 @@ import unicodedata
 from io import BytesIO
 from html import escape
 import requests
+import os
 import streamlit as st
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER
