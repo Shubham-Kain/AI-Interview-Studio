@@ -1,1 +1,30 @@
+# Environment variables — NEVER commit your API keys
 .env
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# Virtual environments
+myenv/
+venv/
+env/
+.venv/
+
+# ChromaDB local data — ephemeral on Render, don't commit
+chroma_db/
+
+# Streamlit cache
+.streamlit/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
