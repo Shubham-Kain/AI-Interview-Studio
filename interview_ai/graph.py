@@ -104,8 +104,8 @@ class AIInterviewGraph:
             self.check_completion,
         )
         builder.add_node(
-            "next_question",
-            self.next_question,
+            "advance_question",
+            self.advance_question,
         )
         builder.add_node(
             "final_evaluation",
@@ -150,13 +150,13 @@ class AIInterviewGraph:
             "check_completion",
             self.route_after_completion,
             {
-                "next": "next_question",
+                "next": "advance_question",
                 "final": "final_evaluation",
             },
         )
         ###  NEXT QUESTION   ###
         builder.add_edge(
-            "next_question",
+            "advance_question",
             "speak_question",
         )
         ###  FINAL  ###
@@ -407,8 +407,8 @@ class AIInterviewGraph:
         ):
             return "final"
         return "next"
-    ###   NEXT QUESTION    ###
-    def next_question(
+    ###   NEXT QUESTION / ADVANCE QUESTION    ###
+    def advance_question(
         self,
         state: InterviewState,
     ):
@@ -444,6 +444,12 @@ class AIInterviewGraph:
             "next_question": "",
             "status": "running",
         }
+
+    def next_question(
+        self,
+        state: InterviewState,
+    ):
+        return self.advance_question(state)
     ###  FINAL EVALUATION   ###
     def final_evaluation(
         self,
@@ -528,16 +534,20 @@ class AIInterviewGraph:
             return {
                 "audio_base64": ""
             }
-        audio = self.tts.generate(
-            question
-        )
-        audio_base64 = (
-            base64.b64encode(
-                audio
-            ).decode(
-                "utf-8"
+        try:
+            audio = self.tts.generate(
+                question
             )
-        )
+            audio_base64 = (
+                base64.b64encode(
+                    audio
+                ).decode(
+                    "utf-8"
+                )
+            )
+        except Exception:
+            audio_base64 = ""
+
         return {
             "audio_base64": audio_base64
         }
