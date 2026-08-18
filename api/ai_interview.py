@@ -27,14 +27,6 @@ def initialize_ai_interview_services(
     _interview_graph = AIInterviewGraph(
         llm=llm
     )
-
-def ensure_ai_interview_graph():
-    global _interview_graph
-    if _interview_graph is not None:
-        return _interview_graph
-    from main import llm
-    initialize_ai_interview_services(llm=llm)
-    return _interview_graph
 # START RESPONSE
 class StartInterviewResponse(
     BaseModel
@@ -82,8 +74,7 @@ def start_interview(
         "Hard",
     ] = Form("Medium"),
 ):
-    graph = ensure_ai_interview_graph()
-    if graph is None:
+    if _interview_graph is None:
         raise HTTPException(
             status_code=500,
             detail="Interview graph is not initialized.",
@@ -93,7 +84,7 @@ def start_interview(
     )
     try:
         result = (
-            graph.start(
+            _interview_graph.start(
                 role=role,
                 difficulty=difficulty,
                 interview_id=interview_id,
@@ -157,8 +148,7 @@ async def answer_interview(
     interview_id: str = Form(...),
     audio: UploadFile = File(...),
 ):
-    graph = ensure_ai_interview_graph()
-    if graph is None:
+    if _interview_graph is None:
         raise HTTPException(
             status_code=500,
             detail="Interview graph is not initialized.",
@@ -179,7 +169,7 @@ async def answer_interview(
     try:
         audio_bytes = await audio.read()
         result = (
-            graph.answer(
+            _interview_graph.answer(
                 interview_id=interview_id,
                 role=session["role"],
                 difficulty=session["difficulty"],
@@ -287,8 +277,7 @@ async def answer_interview(
 def quit_interview(
     interview_id: str,
 ):
-    graph = ensure_ai_interview_graph()
-    if graph is None:
+    if _interview_graph is None:
         raise HTTPException(
             status_code=500,
             detail="Interview graph is not initialized.",
@@ -309,7 +298,7 @@ def quit_interview(
     try:
         # GENERATE FINAL REPORT
         result = (
-            graph.finalize(
+            _interview_graph.finalize(
                 interview_id=interview_id,
                 role=session["role"],
                 difficulty=session["difficulty"],

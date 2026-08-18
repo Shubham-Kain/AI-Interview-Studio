@@ -1,11 +1,15 @@
 from fastapi import FastAPI
 from langchain_openai import ChatOpenAI
 from config import OPENROUTER_API_KEY
+from resume_jd_rag import ResumeJDRAG
+from question_generator import InterviewQuestionGenerator
 from api.interview import (
     router as interview_router,
+    initialize_services as init_interview_services,
 )
 from api.ai_interview import (
     router as ai_interview_router,
+    initialize_ai_interview_services,
 )
 
 ###  FASTAPI APP   ###
@@ -25,6 +29,25 @@ llm = ChatOpenAI(
     openai_api_base="https://openrouter.ai/api/v1",
     openai_api_key=OPENROUTER_API_KEY,
 )
+###  STARTUP EVENT   ###
+@app.on_event("startup")
+async def startup():
+    rag = ResumeJDRAG(
+        llm=llm,
+        persist_directory="./chroma_db",
+        resume_k=2,
+        jd_k=2,
+    )
+    question_generator = InterviewQuestionGenerator(
+        llm=llm
+    )
+    init_interview_services(
+        rag_service=rag,
+        question_generator_service=question_generator,
+    )
+    initialize_ai_interview_services(
+        llm=llm
+    )
 ###  ROUTERS   ###
 app.include_router(
     interview_router
