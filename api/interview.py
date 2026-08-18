@@ -8,6 +8,27 @@ router = APIRouter(
     prefix="/api/interview",
     tags=["Interview Generator"],
 )
+
+def ensure_services():
+    global rag, question_generator
+    if rag is not None and question_generator is not None:
+        return
+    from main import llm
+    if rag is None:
+        rag = ResumeJDRAG(
+            llm=llm,
+            persist_directory="./chroma_db",
+            resume_k=2,
+            jd_k=2,
+        )
+    if question_generator is None:
+        question_generator = InterviewQuestionGenerator(
+            llm=llm,
+        )
+    initialize_services(
+        rag_service=rag,
+        question_generator_service=question_generator,
+    )
 # REQUEST MODEL
 class InterviewGenerateRequest(BaseModel):
     resume_text: str = Field(
@@ -57,6 +78,7 @@ def health():
 def generate_interview(
     request: InterviewGenerateRequest,
 ):
+    ensure_services()
     if rag is None:
         raise HTTPException(
             status_code=500,

@@ -228,10 +228,6 @@ STRICT RAG RULES
 Return the result using the provided structured output schema.
 """
 
-# EMBEDDING MODEL
-embedding = HuggingFaceEmbeddings(
-    model_name="sentence-transformers/all-MiniLM-L6-v2"
-)
 # RESUME RETRIEVAL QUERIES
 RESUME_QUERIES = [
     "candidate name education certifications academic background",
@@ -261,8 +257,16 @@ class ResumeJDRAG:
         self.persist_directory = persist_directory
         self.resume_k = resume_k
         self.jd_k = jd_k
+        self.embedding = None
         # CREATE VECTOR STORES
         self._create_vectorstores()
+
+    def _get_embedding(self):
+        if self.embedding is None:
+            self.embedding = HuggingFaceEmbeddings(
+                model_name="sentence-transformers/all-MiniLM-L6-v2"
+            )
+        return self.embedding
         # STRUCTURED LLM
         self.structured_llm = (
             self.llm.with_structured_output(
@@ -276,6 +280,7 @@ class ResumeJDRAG:
         self.chain = self.prompt | self.structured_llm
     # CREATE / RECREATE VECTOR STORES
     def _create_vectorstores(self):
+        embedding = self._get_embedding()
         self.resume_vectorstore = Chroma(
             collection_name="resume_collection",
             embedding_function=embedding,

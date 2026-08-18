@@ -10,11 +10,20 @@ class SpeechToText:
         device: str = "cpu",
         compute_type: str = "int8",
     ):
-        self.model = WhisperModel(
-            model_size,
-            device=device,
-            compute_type=compute_type,
-        )
+        self.model_size = model_size
+        self.device = device
+        self.compute_type = compute_type
+        self.model = None
+
+    def _get_model(self):
+        if self.model is None:
+            self.model = WhisperModel(
+                self.model_size,
+                device=self.device,
+                compute_type=self.compute_type,
+            )
+        return self.model
+
     def transcribe(
         self,
         audio_bytes: bytes,
@@ -24,6 +33,7 @@ class SpeechToText:
             raise ValueError(
                 "Audio data is empty."
             )
+        model = self._get_model()
         temp_path = None
         try:
             with tempfile.NamedTemporaryFile(
@@ -32,7 +42,7 @@ class SpeechToText:
             ) as file:
                 file.write(audio_bytes)
                 temp_path = file.name
-            segments, _ = self.model.transcribe(
+            segments, _ = model.transcribe(
                 temp_path,
                 language=language,
                 beam_size=5,
