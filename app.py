@@ -811,6 +811,7 @@ def initialize_session_state():
         "ai_final_report": "",
         "ai_final_score": 0,
         "ai_completed_questions": 0,
+        "ai_history": [],
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -818,11 +819,11 @@ def initialize_session_state():
 
 # FASTAPI HEALTH
 
-def check_fastapi():
+def check_fastapi(timeout: int = 4) -> bool:
     try:
         response = requests.get(
             f"{FASTAPI_URL}/health",
-            timeout=5,
+            timeout=timeout,
         )
         return response.ok
     except requests.RequestException:
@@ -1010,18 +1011,35 @@ def render_sidebar():
     st.sidebar.subheader(
         "Backend Status"
     )
-    if check_fastapi():
+    is_online = check_fastapi(timeout=4)
+    if is_online:
         st.sidebar.success(
-            "FastAPI: Connected"
+            "✅ FastAPI: Connected"
         )
     else:
-        st.sidebar.error(
-            "FastAPI: Offline"
+        st.sidebar.warning(
+            "⏳ FastAPI: Sleeping (Free Tier)"
         )
         st.sidebar.caption(
-            f"Backend URL: {FASTAPI_URL}\n"
-            "Ensure the Render backend is deployed and FASTAPI_URL secret is set."
+            "Render free tier automatically sleeps after 15 min of inactivity.\n\n"
+            "Click below to wake it up (~30s):"
         )
+        if st.sidebar.button("⚡ Wake Up Backend", use_container_width=True):
+            with st.sidebar:
+                with st.spinner("Waking up Render backend (~30s)..."):
+                    try:
+                        res = requests.get(
+                            f"{FASTAPI_URL}/health",
+                            timeout=60,
+                        )
+                        if res.ok:
+                            st.success("✅ Backend is now active!")
+                            time.sleep(1)
+                            st.rerun()
+                        else:
+                            st.error(f"Status {res.status_code}")
+                    except Exception:
+                        st.error("Still waking up. Please retry in a few seconds.")
 
 # QUESTION GENERATOR
 
@@ -2108,7 +2126,7 @@ def render_ai_interview():
         with c1:
             st.metric(
                 "Questions Completed",
-                st.session_state.ai_completed_questions,
+                f"{st.session_state.ai_completed_questions} / 5",
             )
         with c2:
             st.metric(
@@ -2116,15 +2134,36 @@ def render_ai_interview():
                 f"{st.session_state.ai_final_score}/10",
             )
         st.subheader(
-            "📊 Final Interview Evaluation"
+            "📊 Final Interview Evaluation Report"
         )
         st.info(
-            "This report is based only on the questions "
-            "you actually answered."
+            "This comprehensive evaluation is based on all questions "
+            "you answered during this interview session."
         )
         st.markdown(
             st.session_state.ai_final_report
         )
+
+        # DETAILED QUESTION-BY-QUESTION BREAKDOWN
+        if st.session_state.get("ai_history"):
+            st.markdown('<div style="height:14px"></div>', unsafe_allow_html=True)
+            st.subheader("📜 Question-by-Question Evaluation Breakdown")
+            for item in st.session_state.ai_history:
+                q_num = item.get("question_number", 1)
+                q_text = item.get("question", "")
+                q_trans = item.get("transcript", "")
+                q_eval = item.get("evaluation", "")
+                q_score = item.get("score", 0)
+                with st.expander(
+                    f"Question {q_num}: {q_text[:70]}... — Score: {q_score}/10",
+                    expanded=(q_num == len(st.session_state.ai_history)),
+                ):
+                    st.markdown(f"**Question {q_num}:** {q_text}")
+                    st.markdown(f"**Your Answer:** *\"{q_trans}\"*")
+                    st.markdown(f"**Score:** `{q_score}/10`")
+                    st.markdown("**Evaluation & Feedback:**")
+                    st.info(q_eval if q_eval else "Evaluation pending.")
+
         st.divider()
         if st.button(
             "🔄 Start New Interview",
@@ -2141,11 +2180,11 @@ def render_ai_interview():
             st.session_state.ai_transcript = ""
             st.session_state.ai_evaluation = ""
             st.session_state.ai_score = 0
+            st.session_state.ai_history = []
             st.session_state.ai_processed_audio_hash = None
             st.rerun()
-        # Don't show the setup/live interview under
-        # the final report until user starts a new session.
         return
+
     # SETUP FORM
     if not st.session_state.interview_started:
         st.write(
@@ -2184,9 +2223,8 @@ def render_ai_interview():
             **Interview Flow**
             AI asks a question → you record your answer →
             STT converts your speech to text → LangGraph evaluates
-            your answer → AI generates the next question → TTS
-            speaks the next question.
-            **Maximum questions: 5**
+            your answer and gives instant feedback → AI generates the next question.
+            **Maximum questions: 5** (You can quit anytime and get your report for completed questions).
             """
         )
         if st.button(
@@ -2230,10 +2268,13 @@ def render_ai_interview():
                     base64.b64decode(
                         result["audio_base64"]
                     )
+                    if result.get("audio_base64")
+                    else None
                 )
                 st.session_state.ai_transcript = ""
                 st.session_state.ai_evaluation = ""
                 st.session_state.ai_score = 0
+                st.session_state.ai_history = []
                 st.session_state.ai_processed_audio_hash = (
                     None
                 )
@@ -2268,6 +2309,7 @@ def render_ai_interview():
                     f"Could not start AI interview: {e}"
                 )
         return
+
     # LIVE INTERVIEW
     st.markdown('<div style="height:14px"></div>', unsafe_allow_html=True)
     role = (
@@ -2291,10 +2333,10 @@ def render_ai_interview():
         <div class="live-v3">
             <div>
                 <div style="font-size:.74rem;font-weight:800;letter-spacing:.1em;opacity:.68;text-transform:uppercase;">
-                    Live Interview
+                    Live Technical Interview
                 </div>
                 <div style="font-size:1.2rem;font-weight:800;margin-top:3px;">
-                    {role}
+                    {role} ({difficulty})
                 </div>
             </div>
             <div style="font-weight:800;">
@@ -2330,7 +2372,7 @@ def render_ai_interview():
             "AI Interviewer"
         )
         st.caption(
-            "Listen to the question and answer naturally."
+            "Listen or read the question, then record your answer below."
         )
         st.write(
             f"Difficulty: **{difficulty}**"
@@ -2358,13 +2400,13 @@ def render_ai_interview():
             )
     st.markdown('<div style="height:18px"></div>', unsafe_allow_html=True)
     # STT
-    st.markdown("## 🎤 Your Answer")
+    st.markdown("## 🎤 Record Your Answer")
     st.markdown(
         """
         <div class="answer-panel">
-            <div class="section-card-title">Record your response</div>
+            <div class="section-card-title">Record your spoken response</div>
             <div class="section-card-subtitle">
-                When recording finishes, your answer is automatically sent to STT and the AI evaluator.
+                When you stop recording, your answer will be transcribed, evaluated with an instant score, and the next question will be generated.
             </div>
         </div>
         """,
@@ -2405,39 +2447,35 @@ def render_ai_interview():
                         ),
                         audio_file=audio_value,
                     )
-                # SAVE CURRENT ANSWER
-                st.session_state.ai_transcript = (
-                    result.get(
-                        "transcript",
-                        "",
-                    )
-                )
-                st.session_state.ai_evaluation = (
-                    result.get(
-                        "evaluation",
-                        "",
-                    )
-                )
-                st.session_state.ai_score = (
-                    result.get(
-                        "score",
-                        0,
-                    )
-                )
-                completed = result.get(
-                    "completed_questions",
-                    question_number,
-                )
-                st.session_state.ai_completed_questions = (
-                    completed
-                )
+                # SAVE CURRENT ANSWER & FEEDBACK
+                transcript = result.get("transcript", "")
+                evaluation = result.get("evaluation", "")
+                score = result.get("score", 0)
+                completed = result.get("completed_questions", question_number)
+
+                st.session_state.ai_transcript = transcript
+                st.session_state.ai_evaluation = evaluation
+                st.session_state.ai_score = score
+                st.session_state.ai_completed_questions = completed
+
+                # APPEND TO HISTORY
+                if "ai_history" not in st.session_state:
+                    st.session_state.ai_history = []
+                st.session_state.ai_history.append({
+                    "question_number": question_number,
+                    "question": question,
+                    "transcript": transcript,
+                    "evaluation": evaluation,
+                    "score": score,
+                })
+
                 # FIVE QUESTIONS COMPLETED
                 if result.get(
                     "interview_completed",
                     False,
                 ):
                     with st.spinner(
-                        "Generating final evaluation..."
+                        "Generating final comprehensive report..."
                     ):
                         final_result = (
                             quit_ai_interview(
@@ -2523,36 +2561,41 @@ def render_ai_interview():
                 st.error(
                     f"Could not process answer: {e}"
                 )
-    # LAST ANSWER
-    if st.session_state.ai_transcript:
+
+    # RECENT ANSWER & FEEDBACK (DISPLAYED PROMINENTLY)
+    if st.session_state.get("ai_history"):
         st.markdown('<div style="height:16px"></div>', unsafe_allow_html=True)
-        st.subheader(
-            "📝 Your Last Answer"
-        )
-        st.write(
-            st.session_state.ai_transcript
-        )
-    # CURRENT EVALUATION
-    if st.session_state.ai_evaluation:
-        st.markdown('<div style="height:10px"></div>', unsafe_allow_html=True)
-        with st.expander(
-            f"🧠 Current Answer Evaluation "
-            f"— {st.session_state.ai_score}/10"
-        ):
-            st.write(
-                st.session_state.ai_evaluation
-            )
-    # QUIT
+        latest = st.session_state.ai_history[-1]
+        st.subheader("🎯 Latest Question Evaluation & Score")
+        col_s, col_t = st.columns([1, 4])
+        with col_s:
+            st.metric("Latest Score", f"{latest.get('score', 0)}/10")
+        with col_t:
+            st.markdown(f"**What we heard:** *\"{latest.get('transcript', '')}\"*")
+        
+        st.info(latest.get("evaluation", "Evaluation in progress..."))
+
+        # ALL PREVIOUS QUESTIONS EXPANDER
+        if len(st.session_state.ai_history) > 1:
+            with st.expander(f"📜 View All {len(st.session_state.ai_history)} Completed Questions & Feedback"):
+                for item in st.session_state.ai_history:
+                    st.markdown(f"**Q{item.get('question_number')}:** {item.get('question')}")
+                    st.markdown(f"**Answer:** *\"{item.get('transcript')}\"*")
+                    st.markdown(f"**Score:** `{item.get('score')}/10`")
+                    st.markdown(f"**Feedback:** {item.get('evaluation')}")
+                    st.divider()
+
+    # QUIT / FINALIZE EARLY BUTTON
     st.divider()
     if st.button(
-        "⏹️ Quit Interview",
+        "⏹️ End Interview & View Evaluation Report",
         use_container_width=True,
         key="quit_ai_interview",
     ):
         try:
             if st.session_state.ai_interview_id:
                 with st.spinner(
-                    "Generating final evaluation..."
+                    "Generating comprehensive evaluation report for answered questions..."
                 ):
                     final_result = (
                         quit_ai_interview(
@@ -2575,7 +2618,7 @@ def render_ai_interview():
                 st.session_state.ai_completed_questions = (
                     final_result.get(
                         "completed_questions",
-                        0,
+                        len(st.session_state.get("ai_history", [])),
                     )
                 )
         except requests.ConnectionError:

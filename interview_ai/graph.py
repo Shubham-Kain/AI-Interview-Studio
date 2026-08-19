@@ -475,6 +475,20 @@ class AIInterviewGraph:
                         1,
                     ).strip()
                 )
+
+        # Handle early quit with zero completed questions
+        if completed == 0 or not evaluations:
+            return {
+                "final_report": (
+                    "### ℹ️ Interview Ended Early\n\n"
+                    "No interview questions were answered during this session. "
+                    "Start a new interview session and answer at least one question "
+                    "to generate a detailed technical evaluation report!"
+                ),
+                "final_average_score": 0.0,
+                "status": "completed",
+            }
+
         from interview_ai.prompts import (
             FINAL_EVALUATION_PROMPT,
         )
